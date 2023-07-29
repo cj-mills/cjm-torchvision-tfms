@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "cjm-torchvision-tfms"
+  site-url: "https://cj-mills.github.io/cjm-torchvision-tfms"
+  description: "Some custom Torchvision tranforms."
+  repo-branch: main
+  repo-url: "https://github.com/cj-mills/cjm-torchvision-tfms"

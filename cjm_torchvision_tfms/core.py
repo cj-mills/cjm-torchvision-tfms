@@ -27,13 +27,6 @@ class ResizeMax(transforms.Transform):
     """
     A PyTorch Transform class that resizes an image such that the maximum dimension 
     is equal to a specified size while maintaining the aspect ratio.
-    
-    Inherits from the PyTorch Transform class (transforms.Transform).
-
-    Attributes:
-    -----------
-    max_sz : int
-        The maximum size for any dimension (height or width) of the image.
     """
     
     def __init__(self, 
@@ -78,12 +71,6 @@ class PadSquare(transforms.Transform):
     PadSquare is a PyTorch Transform class used to pad images to make them square. 
     Depending on the configuration, padding can be applied equally on both sides, 
     or can be randomly split between the two sides.
-    
-    Attributes:
-        padding_mode (str): The method to use for padding. Default is 'constant'.
-        fill (tuple): The RGB values to use for padding if padding_mode is 'constant'. Default is (123, 117, 104).
-        shift (bool): If True, padding is randomly split between the two sides. If False, padding is equally applied. Default is True.
-        pad_split (float): The proportion of padding applied to one side of the image. Only used when shift is True.
     """
 
     def __init__(self, 

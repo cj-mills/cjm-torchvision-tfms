@@ -36,15 +36,11 @@ class ResizeMax(transforms.Transform):
         The maximum size for any dimension (height or width) of the image.
     """
     
-    def __init__(self, max_sz=256):
+    def __init__(self, 
+                 max_sz:int=256 # The maximum size for any dimension (height or width) of the image.
+                ):
         """
         Initialize ResizeMax object with a specified max_sz. 
-
-        Parameters:
-        -----------
-        max_sz : int, optional
-            The maximum size for any dimension (height or width) of the image. 
-            Default is 256.
         """
         # Call to the parent class (Transform) constructor
         super().__init__()
@@ -52,22 +48,12 @@ class ResizeMax(transforms.Transform):
         # Set the maximum size for any dimension of the image
         self.max_sz = max_sz
         
-    def _transform(self, inpt: Any, params: Dict[str, Any]):
+    def _transform(self, 
+                   inpt: Any, # The input image tensor to be resized.
+                   params: Dict[str, Any] # A dictionary of parameters. Not used in this method but is present for compatibility with the parent's method signature.
+                  ) -> torch.Tensor: # The resized image tensor.
         """
         Apply the ResizeMax transformation on an input image tensor.
-
-        Parameters:
-        -----------
-        inpt : torch.Tensor
-            The input image tensor to be resized.
-        params : dict
-            A dictionary of parameters. Not used in this method but is present for 
-            compatibility with the parent's method signature.
-
-        Returns:
-        --------
-        torch.Tensor
-            The resized image tensor.
         """
 
         # Copy the input tensor to a new variable
@@ -86,7 +72,7 @@ class ResizeMax(transforms.Transform):
         # Return the transformed (resized) image tensor
         return x
 
-# %% ../nbs/00_core.ipynb 13
+# %% ../nbs/00_core.ipynb 12
 class PadSquare(transforms.Transform):
     """
     PadSquare is a PyTorch Transform class used to pad images to make them square. 
@@ -100,14 +86,13 @@ class PadSquare(transforms.Transform):
         pad_split (float): The proportion of padding applied to one side of the image. Only used when shift is True.
     """
 
-    def __init__(self, padding_mode='constant', fill=(123, 117, 104), shift=True):
+    def __init__(self, 
+                 padding_mode:str='constant', # The method to use for padding. Default is 'constant'.
+                 fill:tuple=(123, 117, 104), # The RGB values to use for padding if padding_mode is 'constant'.
+                 shift:bool=True # If True, padding is randomly split between the two sides. If False, padding is equally applied.
+                ):
         """
         The constructor for PadSquare class.
-
-        Parameters:
-            padding_mode (str): The method to use for padding. Default is 'constant'.
-            fill (tuple): The RGB values to use for padding if padding_mode is 'constant'. Default is (123, 117, 104).
-            shift (bool): If True, padding is randomly split between the two sides. If False, padding is equally applied. Default is True.
         """
         super().__init__()
         self.padding_mode = padding_mode
@@ -115,30 +100,22 @@ class PadSquare(transforms.Transform):
         self.shift = shift
         self.pad_split = None
 
-    def forward(self, *inputs: Any) -> Any:
+    def forward(self, 
+                *inputs: Any # The inputs to the forward method.
+               ) -> Any: # The result of the superclass forward method.
         """
         The forward method that sets up the padding split factor if 'shift' is True, 
         and then calls the superclass forward method.
-        
-        Parameters:
-            *inputs (Any): The inputs to the forward method.
-
-        Returns:
-            Any: The result of the superclass forward method.
         """
         self.pad_split = random.random() if self.shift else None
         return super().forward(*inputs)
 
-    def _transform(self, inpt: Any, params: Dict[str, Any]):
+    def _transform(self, 
+                   inpt: Any, # The input to be transformed.
+                   params: Dict[str, Any] # A dictionary of parameters for the transformation.
+                  ) -> Any: # The transformed input.
         """
         The _transform method that applies padding to the input to make it square.
-        
-        Parameters:
-            inpt (Any): The input to be transformed.
-            params (Dict[str, Any]): A dictionary of parameters for the transformation.
-
-        Returns:
-            Any: The transformed input.
         """
         x = inpt
         
@@ -164,8 +141,12 @@ class PadSquare(transforms.Transform):
         
         return x
 
-# %% ../nbs/00_core.ipynb 16
+# %% ../nbs/00_core.ipynb 15
 class CustomTrivialAugmentWide(torchvision.transforms.TrivialAugmentWide):
+    """
+    This class extends the TrivialAugmentWide class provided by PyTorch's transforms module.
+    TrivialAugmentWide is an augmentation policy randomly applies a single augmentation to each image.
+    """
     def __init__(
         self,
         num_magnitude_bins: int = 31,
@@ -176,5 +157,7 @@ class CustomTrivialAugmentWide(torchvision.transforms.TrivialAugmentWide):
         super().__init__(num_magnitude_bins, interpolation, fill)
         self.op_meta = op_meta if op_meta else super()._augmentation_space(num_bins)
 
-    def _augmentation_space(self, num_bins: int) -> Dict[str, Tuple[torch.Tensor, bool]]:
+    def _augmentation_space(self, 
+                            num_bins: int
+                           ) -> Dict[str, Tuple[torch.Tensor, bool]]:
         return self.op_meta

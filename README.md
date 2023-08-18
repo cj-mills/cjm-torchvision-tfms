@@ -10,8 +10,6 @@ pip install cjm_torchvision_tfms
 
 ## How to use
 
-Fill me in please! Don’t forget code examples:
-
 ``` python
 from PIL import Image
 

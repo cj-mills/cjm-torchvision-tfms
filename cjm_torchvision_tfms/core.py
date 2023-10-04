@@ -18,14 +18,15 @@ from PIL import Image
 import torch
 import torchvision
 torchvision.disable_beta_transforms_warning()
-from torchvision.datapoints import BoundingBox
+from torchvision.tv_tensors import BoundingBoxes
 from torchvision.utils import draw_bounding_boxes
 import torchvision.transforms.v2  as transforms
 from torchvision.transforms.v2 import functional as TF
 
-from torchvision.transforms.v2.utils import query_spatial_size, query_bounding_box
+from torchvision.transforms.v2._utils import query_size, get_bounding_boxes
 from torchvision.ops.boxes import box_iou
-from torchvision.datapoints import BoundingBoxFormat
+from torchvision.ops import box_convert
+from torchvision.tv_tensors import BoundingBoxFormat
 
 from torchvision.utils import draw_bounding_boxes
 
@@ -60,7 +61,7 @@ class ResizeMax(transforms.Transform):
         x = inpt
 
         # Get the width and height of the image tensor
-        spatial_size = TF.get_spatial_size(x)
+        spatial_size = TF.get_size(x)
 
         # Calculate the size for the smaller dimension, such that the aspect ratio 
         # of the image is maintained when the larger dimension is resized to max_sz
@@ -114,7 +115,7 @@ class PadSquare(transforms.Transform):
         x = inpt
         
         # Get the width and height of the image tensor
-        h, w = TF.get_spatial_size(x)
+        h, w = TF.get_size(x)
         
         # If shift is true, padding is randomly split between two sides
         if self.shift:
@@ -177,14 +178,14 @@ class CustomRandomIoUCrop(transforms.RandomIoUCrop):
         self.jitter_factor = jitter_factor
     
     def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
-        orig_h, orig_w = query_spatial_size(flat_inputs)
-        bboxes = query_bounding_box(flat_inputs)
+        orig_h, orig_w = query_size(flat_inputs)
+        bboxes = get_bounding_boxes(flat_inputs)
         
         bbox_dims = bboxes[...,2:]
 
         # Get all bbox centers
-        xyxy_bboxes_orig = TF.convert_format_bounding_box(
-            bboxes.as_subclass(torch.Tensor), bboxes.format, torchvision.datapoints.BoundingBoxFormat.XYXY
+        xyxy_bboxes_orig = box_convert(
+            bboxes.as_subclass(torch.Tensor), bboxes.format.value.lower(), torchvision.tv_tensors.BoundingBoxFormat.XYXY.value.lower()
         )
 
         cx = 0.5 * (xyxy_bboxes_orig[..., 0] + xyxy_bboxes_orig[..., 2])

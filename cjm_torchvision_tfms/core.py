@@ -347,7 +347,8 @@ class RandomPatchCopy(transforms.Transform):
         """Default Behavior: Don't modify the input"""
         return inpt
 
-    @_transform.register
+    @_transform.register(torch.Tensor)
+    @_transform.register(tv_tensors.Image)
     def _(self, inpt: Union[torch.Tensor, tv_tensors.Image], params: Dict[str, Any]) -> Any:
         self.patches = []
         """Apply the `rand_square_copy` function to the input tensor multiple times"""
@@ -356,13 +357,13 @@ class RandomPatchCopy(transforms.Transform):
             self.patches.append(patch)
         return inpt
 
-    @_transform.register
+    @_transform.register(Image.Image)
     def _(self, inpt: Image.Image, params: Dict[str, Any]) -> Any:
         """Convert the PIL Image to a torch.Tensor to apply the transform"""
         inpt_torch = transforms.PILToTensor()(inpt)    
         return transforms.ToPILImage()(self._transform(inpt_torch, params))
     
-    @_transform.register
+    @_transform.register(BoundingBoxes)
     def _(self, inpt: BoundingBoxes, params: Dict[str, Any]) -> Any:
         """Update the bounding box annotations based on the list of patches"""
         if len(self.patches) > 0:
@@ -377,7 +378,7 @@ class RandomPatchCopy(transforms.Transform):
             return tv_wrap(inpt_copy, like=inpt)
         return inpt
 
-    @_transform.register
+    @_transform.register(Mask)
     def _(self, inpt: Mask, params: Dict[str, Any]) -> Any:
         """Don't modify segmentation annotations"""
         return inpt

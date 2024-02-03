@@ -266,8 +266,7 @@ class RandomPatchCopy(transforms.Transform):
                  max_num:int=4, # The maximum number of times to apply the `rand_square_copy` function.
                  iou_thresh:float=0.25 # The IoU threshold for bounding box suppression.
                 ):
-        if sys.version_info < (3, 11):
-            raise RuntimeError("RandomPatchCopy requires Python 3.11 or newer.")
+        
         super().__init__()
         self.pct = pct
         self.min_num = min_num
@@ -393,8 +392,7 @@ class RandomPixelCopy(transforms.Transform):
                  min_pct=0.0025, # The minimum percentage of the tensor's pixels to be copied.
                  max_pct:float=0.1 # The maximum percentage of the tensor's pixels to be copied.
                 ):
-        if sys.version_info < (3, 11):
-            raise RuntimeError("RandomPixelCopy requires Python 3.11 or newer.")
+        
         super().__init__()
         self.min_pct = min_pct
         self.max_pct = max_pct

@@ -440,18 +440,20 @@ class RandomPixelCopy(transforms.Transform):
         """Default Behavior: Don't modify the input"""
         return inpt
 
-    @_transform.register
+    @_transform.register(torch.Tensor)
+    @_transform.register(tv_tensors.Image)
     def _(self, inpt: Union[torch.Tensor, tv_tensors.Image], params: Dict[str, Any]) -> Any:
         """Apply the `rand_pixel_copy` method to the input tensor"""
         return self.rand_pixel_copy(inpt, max(self.min_pct, random.random() * self.max_pct))
 
-    @_transform.register
+    @_transform.register(Image.Image)
     def _(self, inpt: Image.Image, params: Dict[str, Any]) -> Any:
         """Convert the PIL Image to a torch.Tensor to apply the transform"""
         inpt_torch = transforms.PILToTensor()(inpt)
         return transforms.ToPILImage()(self._transform(inpt_torch, params))
 
-    @_transform.register
+    @_transform.register(BoundingBoxes)
+    @_transform.register(Mask)
     def _(self, inpt: Union[BoundingBoxes, Mask], params: Dict[str, Any]) -> Any:
         """Don't modify image annotations"""
         return inpt

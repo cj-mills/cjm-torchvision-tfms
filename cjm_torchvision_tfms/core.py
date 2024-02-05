@@ -216,8 +216,8 @@ class CustomRandomIoUCrop(transforms.RandomIoUCrop):
             crop_center_y = cy[center_idx]
             
             # Add jitter to the crop centers
-            jitter_val_x = self.jitter_factor * bbox_dims[center_idx.item()][0].item() * torch.randn(1)
-            jitter_val_y = self.jitter_factor * bbox_dims[center_idx.item()][1].item() * torch.randn(1)
+            jitter_val_x = self.jitter_factor * bbox_dims[center_idx.item()][0].item() * torch.randn(1).to(crop_center_x.device)
+            jitter_val_y = self.jitter_factor * bbox_dims[center_idx.item()][1].item() * torch.randn(1).to(crop_center_y.device)
 
             crop_center_x += jitter_val_x
             crop_center_y += jitter_val_y
@@ -254,7 +254,7 @@ class CustomRandomIoUCrop(transforms.RandomIoUCrop):
                         is_within_crop_area=is_within_crop_area)
         return dict()
 
-# %% ../nbs/00_core.ipynb 24
+# %% ../nbs/00_core.ipynb 23
 class RandomPatchCopy(transforms.Transform):
     """
     A torchvision V2 transform that copies data from a randomly selected rectangular patch
@@ -382,7 +382,7 @@ class RandomPatchCopy(transforms.Transform):
         """Don't modify segmentation annotations"""
         return inpt
 
-# %% ../nbs/00_core.ipynb 27
+# %% ../nbs/00_core.ipynb 26
 class RandomPixelCopy(transforms.Transform):
     """
     A torchvision V2 transform that copies data from a randomly selected set of pixels to another 

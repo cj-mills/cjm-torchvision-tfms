@@ -488,34 +488,42 @@ class CustomRandomAugment(torch.nn.Module):
 
         # Number of bins for discretizing continuous parameters of augmentations
         self.num_bins = num_bins
-
-        # Create lists of transformations for sharpness, posterization, and solarization
-        # with granularity defined by num_bins
-        self.random_sharpness_tfms = [transforms.RandomAdjustSharpness(sharpness_factor=x, p=1.0) 
-                                      for x in torch.linspace(*sharpness, num_bins)]
-        self.random_posterize_tfms = [transforms.RandomPosterize(bits=x, p=1.0) 
-                                      for x in torch.linspace(*posterize, num_bins).floor().int().numpy()]
-        self.random_solarize_tfms = [transforms.RandomSolarize(threshold=x, p=1.0) 
-                                     for x in torch.linspace(*solarize, num_bins)]
-
-        # Compose a transform that randomly selects from the list of transformations including
-        # identity (no-op), affine transforms, rotations, color jitters, sharpness, posterize,
-        # solarize, autocontrast, equalize, and Gaussian blur.
-        self.transforms = transforms.RandomChoice([
+        transformation_list = [
             transforms.Identity(),  # No-op, to sometimes leave images unchanged
-            transforms.RandomAffine(degrees=0.0, shear=shear),  # Random shear
-            transforms.RandomAffine(degrees=0.0, translate=(translate, translate)),  # Random translation
-            transforms.RandomRotation(degrees=degrees),  # Random rotation
-            transforms.ColorJitter(brightness=brightness),  # Adjust brightness
-            transforms.ColorJitter(hue=(-hue, hue)),  # Adjust hue
-            transforms.ColorJitter(saturation=saturation),  # Adjust saturation
-            transforms.ColorJitter(contrast=contrast),  # Adjust contrast
-            transforms.RandomChoice(self.random_sharpness_tfms),  # Random sharpness
-            transforms.RandomChoice(self.random_posterize_tfms),  # Random posterize
-            transforms.RandomChoice(self.random_solarize_tfms),  # Random solarize
             transforms.RandomAutocontrast(p=1.0),  # Random autocontrast
             transforms.RandomEqualize(p=1.0),  # Random equalize
-        ])
+        ]
+
+        if shear is not None:
+            transformation_list.append(transforms.RandomAffine(degrees=0.0, shear=shear))
+        if translate is not None:
+            transformation_list.append(transforms.RandomAffine(degrees=0.0, translate=(translate, translate)))
+        if degrees is not None:
+            transformation_list.append(transforms.RandomRotation(degrees=degrees))
+        if brightness is not None:
+            transformation_list.append(transforms.ColorJitter(brightness=brightness))
+        if hue is not None:
+            transformation_list.append(transforms.ColorJitter(hue=(-hue, hue)))
+        if saturation is not None:
+            transformation_list.append(transforms.ColorJitter(saturation=saturation))
+        if contrast is not None:
+            transformation_list.append(transforms.ColorJitter(contrast=contrast))
+
+        if sharpness is not None:
+            random_sharpness_tfms = [transforms.RandomAdjustSharpness(sharpness_factor=x, p=1.0) 
+                                     for x in torch.linspace(*sharpness, num_bins)]
+            transformation_list.append(transforms.RandomChoice(random_sharpness_tfms))
+        if posterize is not None:
+            random_posterize_tfms = [transforms.RandomPosterize(bits=x, p=1.0) 
+                                     for x in torch.linspace(*posterize, num_bins).floor().int().numpy()]
+            transformation_list.append(transforms.RandomChoice(random_posterize_tfms))
+        if solarize is not None:
+            random_solarize_tfms = [transforms.RandomSolarize(threshold=x, p=1.0) 
+                                    for x in torch.linspace(*solarize, num_bins)]
+            transformation_list.append(transforms.RandomChoice(random_solarize_tfms))
+
+        # Compose the transform
+        self.transforms = transforms.RandomChoice(transformation_list)
     
     def forward(self, img, targets=None):
         """

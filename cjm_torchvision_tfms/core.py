@@ -478,7 +478,9 @@ class CustomRandomAugment(torch.nn.Module):
                  contrast:float=0.75, # Contrast adjustment factor.
                  sharpness:tuple=(0.0, 1.99), # Range for sharpness factor adjustments.
                  posterize:tuple=(2.0, 8.0), # Range for bits in posterization.
-                 solarize:tuple=(1.0, 255.0) #  Threshold range for solarization.
+                 solarize:tuple=(1.0, 255.0), #  Threshold range for solarization.
+                 auto_contrast:bool=True,
+                 equalize:bool=True,
                 ):
         """
         Initializes the CustomRandomAugment object with specific parameters for augmentations.
@@ -490,10 +492,8 @@ class CustomRandomAugment(torch.nn.Module):
         self.num_bins = num_bins
         transformation_list = [
             transforms.Identity(),  # No-op, to sometimes leave images unchanged
-            transforms.RandomAutocontrast(p=1.0),  # Random autocontrast
-            transforms.RandomEqualize(p=1.0),  # Random equalize
         ]
-
+        
         if shear is not None:
             transformation_list.append(transforms.RandomAffine(degrees=0.0, shear=shear))
         if translate is not None:
@@ -521,6 +521,11 @@ class CustomRandomAugment(torch.nn.Module):
             random_solarize_tfms = [transforms.RandomSolarize(threshold=x, p=1.0) 
                                     for x in torch.linspace(*solarize, num_bins)]
             transformation_list.append(transforms.RandomChoice(random_solarize_tfms))
+
+        if auto_contrast:
+            transformation_list.append(transforms.RandomAutocontrast(p=1.0))  # Random autocontrast
+        if equalize:
+            transformation_list.append(transforms.RandomEqualize(p=1.0))  # Random equalize
 
         # Compose the transform
         self.transforms = transforms.RandomChoice(transformation_list)

@@ -165,7 +165,6 @@ class CustomTrivialAugmentWide(torchvision.transforms.TrivialAugmentWide):
 
 # %% ../nbs/00_core.ipynb 18
 class CustomRandomIoUCrop(transforms.RandomIoUCrop):
-    
     """
     A customized Random IoU crop transformation that inherits from torchvision's RandomIoUCrop transform.
     """

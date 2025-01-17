@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['ResizeMax', 'PadSquare', 'CustomTrivialAugmentWide', 'CustomRandomIoUCrop', 'RandomPatchCopy', 'RandomPixelCopy',
-           'CustomRandomAugment']
+           'CustomRandomAugment', 'AddLightGlare']
 
 # %% ../nbs/00_core.ipynb 4
 import sys
@@ -544,3 +544,148 @@ class CustomRandomAugment(torch.nn.Module):
         """
         # Apply the composed transformations to the image and targets
         return self.transforms(img, targets)
+
+# %% ../nbs/00_core.ipynb 35
+import random
+from functools import singledispatchmethod
+from typing import Dict, Any
+
+import torchvision
+from torchvision import tv_tensors
+import torchvision.transforms.v2 as transforms
+import torchvision.transforms.v2.functional as F
+from torchvision.transforms.v2 import functional as TF
+
+from PIL import Image, ImageFilter, ImageChops
+
+torchvision.disable_beta_transforms_warning()
+
+
+class AddLightGlare(transforms.Transform):
+    """
+    A custom torchvision V2 transform that adds a simple bloom/glare effect
+    to images. All parameters can optionally be randomized from user-specified
+    ranges.
+    """
+
+    def __init__(
+        self,
+        threshold_range=(180, 220),
+        blur_radius_range=(5, 20),
+        intensity_range=(0.5, 1.0),
+    ):
+        """
+        Args:
+            threshold_range (tuple): Range for the brightness threshold (0..255).
+            blur_radius_range (tuple): Range for the Gaussian blur radius.
+            intensity_range (tuple): Range for how strongly the glare is blended back.
+        """
+        super().__init__()
+        self.threshold_range = threshold_range
+        self.blur_radius_range = blur_radius_range
+        self.intensity_range = intensity_range
+
+    def _get_params(self, sample: Any) -> Dict[str, float]:
+        """
+        Randomly sample the parameters from the specified ranges.
+        """
+        threshold = random.uniform(*self.threshold_range)
+        blur_radius = random.uniform(*self.blur_radius_range)
+        intensity = random.uniform(*self.intensity_range)
+
+        return {
+            "threshold": threshold,
+            "blur_radius": blur_radius,
+            "intensity": intensity,
+        }
+
+    @singledispatchmethod
+    def _transform(self, inpt, params):
+        """
+        Default behavior for unsupported input types: return unchanged.
+        """
+        return inpt
+
+    @_transform.register(Image.Image)
+    def _(self, inpt: Image.Image, params):
+        """
+        Handle PIL Images directly.
+        """
+        return self._apply_glare_pil(
+            image=inpt,
+            threshold=params["threshold"],
+            blur_radius=params["blur_radius"],
+            intensity=params["intensity"],
+        )
+
+    @_transform.register(torch.Tensor)
+    @_transform.register(tv_tensors.Image)
+    def _(self, inpt: torch.Tensor, params):
+        """
+        Handle torch.Tensor / tv_tensors.Image by converting to PIL,
+        applying the glare, and converting back to the original type.
+        """
+        # Convert Tensor -> PIL
+        pil_img = F.to_pil_image(inpt)
+
+        # Apply glare
+        glare_pil = self._apply_glare_pil(
+            image=pil_img,
+            threshold=params["threshold"],
+            blur_radius=params["blur_radius"],
+            intensity=params["intensity"],
+        )
+
+        # Convert back PIL -> Tensor
+        out_tensor = transforms.PILToTensor()(glare_pil).float()
+
+        # If the input was a tv_tensors.Image, wrap it back in the same class
+        if isinstance(inpt, tv_tensors.Image):
+            return tv_tensors.Image(out_tensor)
+        else:
+            return out_tensor
+
+    @_transform.register(tv_tensors.BoundingBoxes)
+    @_transform.register(tv_tensors.Mask)
+    def _(self, inpt, params):
+        """
+        Do not modify bounding boxes or masks.
+        """
+        return inpt
+
+    def _apply_glare_pil(
+        self,
+        image: Image.Image,
+        threshold: float,
+        blur_radius: float,
+        intensity: float,
+    ) -> Image.Image:
+        """
+        Applies a bloom/glare effect to a PIL image using the given parameters.
+        Equivalent to your `add_light_glare` function, but with dynamic 
+        parameter inputs.
+        """
+        # Convert image to RGB to ensure consistent channel operations
+        image_rgb = image.convert("RGB")
+
+        # 1. Create a brightness mask of the bright areas
+        gray = image_rgb.convert("L")
+        mask = gray.point(lambda p: 255 if p > threshold else 0, mode="L")
+
+        # 2. Convert that mask to an image we can blur:
+        #    multiply() with the mask isolates only the brightest areas
+        glow_source = ImageChops.multiply(
+            image_rgb,
+            Image.merge("RGB", (mask, mask, mask))
+        )
+
+        # 3. Blur the isolated bright regions
+        glow_blurred = glow_source.filter(ImageFilter.GaussianBlur(blur_radius))
+
+        # 4. Screen-blend the blurred glow back onto the original
+        glare_output = ImageChops.screen(image_rgb, glow_blurred)
+
+        # 5. Blend glare_output with the original according to 'intensity'
+        result = Image.blend(image_rgb, glare_output, intensity)
+
+        return result

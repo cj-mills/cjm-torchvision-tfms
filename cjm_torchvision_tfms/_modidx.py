@@ -177,7 +177,7 @@ d = { 'settings': { 'branch': 'main',
                                                                                                          'cjm_torchvision_tfms/transforms.py'),
                                                  'cjm_torchvision_tfms.transforms.ResizeMax._transform': ( 'transforms.html#resizemax._transform',
                                                                                                            'cjm_torchvision_tfms/transforms.py')},
-            'cjm_torchvision_tfms.utils': { 'cjm_torchvision_tfms.utils._find_largest_rectangle_coords': ( 'utils.html#_find_largest_rectangle_coords',
-                                                                                                           'cjm_torchvision_tfms/utils.py'),
-                                            'cjm_torchvision_tfms.utils._largest_rectangle_in_histogram': ( 'utils.html#_largest_rectangle_in_histogram',
-                                                                                                            'cjm_torchvision_tfms/utils.py')}}}
+            'cjm_torchvision_tfms.utils': { 'cjm_torchvision_tfms.utils.find_largest_rectangle_coords': ( 'utils.html#find_largest_rectangle_coords',
+                                                                                                          'cjm_torchvision_tfms/utils.py'),
+                                            'cjm_torchvision_tfms.utils.largest_rectangle_in_histogram': ( 'utils.html#largest_rectangle_in_histogram',
+                                                                                                           'cjm_torchvision_tfms/utils.py')}}}

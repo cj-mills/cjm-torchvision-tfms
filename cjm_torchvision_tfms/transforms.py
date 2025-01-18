@@ -882,7 +882,7 @@ import torchvision.transforms.v2 as transforms
 import torchvision.transforms.v2.functional as F
 from torchvision.tv_tensors import BoundingBoxes, Mask, Image as TVImage
 
-from .utils import _find_largest_rectangle_coords
+from .utils import find_largest_rectangle_coords
 
 class RandomPerspectiveCrop(transforms.Transform):
     """
@@ -1059,7 +1059,7 @@ class RandomPerspectiveCrop(transforms.Transform):
     # -----------------------------------------------------
     def _crop_largest_rectangle(self, image, target, wm_tensor):
         """
-        Uses _find_largest_rectangle_coords(...) approach to find
+        Uses find_largest_rectangle_coords(...) approach to find
         the largest rectangle of True pixels in wm_tensor, then crops
         image/boxes/masks to that rectangle.
         """
@@ -1067,7 +1067,7 @@ class RandomPerspectiveCrop(transforms.Transform):
         white_mask_np = wm_tensor.cpu().numpy()  # shape [H, W], dtype=bool
 
         # 1) Find row_slice, col_slice
-        row_slice, col_slice = _find_largest_rectangle_coords(white_mask_np)
+        row_slice, col_slice = find_largest_rectangle_coords(white_mask_np)
         # row_slice and col_slice are Python slice objects
 
         # If the largest rectangle is effectively zero-sized, skip

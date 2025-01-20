@@ -6,6 +6,7 @@
 __all__ = ['round_up_to_multiple', 'find_largest_rectangle_coords', 'largest_rectangle_in_histogram']
 
 # %% ../nbs/02_utils.ipynb 4
+import math
 from typing import Tuple
 import numpy as np
 

@@ -564,9 +564,7 @@ from PIL import Image, ImageFilter, ImageChops
 
 class AddLightGlare(transforms.Transform):
     """
-    A custom torchvision V2 transform that adds a simple bloom/glare effect
-    to images. All parameters can optionally be randomized from user-specified
-    ranges.
+    Adds a simple bloom/glare effect to images. All parameters can optionally be randomized from user-specified ranges.
     """
 
     def __init__(
@@ -694,8 +692,7 @@ class AddLightGlare(transforms.Transform):
 # %% ../nbs/01_transforms.ipynb 38
 class AddHaze(transforms.Transform):
     """
-    A custom torchvision V2 transform that applies a haze/fog effect to images.
-    Each parameter can be sampled from user-provided ranges. For fog_color, 
+    Applies a haze/fog effect to images. Each parameter can be sampled from user-provided ranges. For fog_color, 
     we pick a single channel (0..255) and use it for (R, G, B).
     """
 
@@ -833,6 +830,10 @@ class AddHaze(transforms.Transform):
 
 # %% ../nbs/01_transforms.ipynb 40
 class RandomPerspectiveOpenCV:
+    """
+    Randomly applies a perspective transformation to an image (and its associated target data)
+    using OpenCV.
+    """
     def __init__(self, distortion_scale=0.5, p=0.5, fill=0, min_area=1.0, max_attempts=10):
         self.distortion_scale = distortion_scale
         self.p = p
@@ -1026,10 +1027,10 @@ from .utils import find_largest_rectangle_coords
 
 class RandomPerspectiveCrop(transforms.Transform):
     """
-    Usage:
-        transformed_img, new_target = RandomPerspectiveCrop(
-            distortion_scale=0.5, p=1.0, crop_strategy="largest_rectangle"
-        )(img, target)
+    Randomly applies a perspective transform to an image (and its target data),
+    then crops the result based on a chosen strategy. This transform is useful
+    for simulating complex distortions while ensuring the final image is neatly
+    cropped to valid (non-distorted) areas.
     """
 
     def __init__(

@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['ResizeMax', 'PadSquare', 'CustomTrivialAugmentWide', 'CustomRandomIoUCrop', 'RandomPatchCopy', 'RandomPixelCopy',
-           'CustomRandomAugment', 'AddLightGlare', 'RandomPerspectiveOpenCV', 'RandomPerspectiveCrop']
+           'CustomRandomAugment', 'AddLightGlare', 'AddHaze', 'RandomPerspectiveOpenCV', 'RandomPerspectiveCrop']
 
 # %% ../nbs/01_transforms.ipynb 4
 import sys
@@ -17,7 +17,7 @@ from cjm_pytorch_utils.core import pil_to_tensor, tensor_to_pil
 
 import numpy as np
 
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance
 
 # Import PyTorch dependencies
 import torch
@@ -692,6 +692,146 @@ class AddLightGlare(transforms.Transform):
         return result
 
 # %% ../nbs/01_transforms.ipynb 38
+class AddHaze(transforms.Transform):
+    """
+    A custom torchvision V2 transform that applies a haze/fog effect to images.
+    Each parameter can be sampled from user-provided ranges. For fog_color, 
+    we pick a single channel (0..255) and use it for (R, G, B).
+    """
+
+    def __init__(
+        self, 
+        blur_radius_range=(2, 6), 
+        fog_intensity_range=(0.2, 0.5), 
+        contrast_factor_range=(0.7, 0.9)
+    ):
+        """
+        Args:
+            blur_radius_range (tuple): Range from which to sample the Gaussian blur radius.
+            fog_intensity_range (tuple): Range from which to sample the opacity of the fog overlay [0..1].
+            contrast_factor_range (tuple): Range from which to sample the factor by which contrast is reduced.
+        """
+        super().__init__()
+        self.blur_radius_range = blur_radius_range
+        self.fog_intensity_range = fog_intensity_range
+        self.contrast_factor_range = contrast_factor_range
+
+    def _get_params(self, sample: Any) -> Dict[str, float]:
+        """
+        Randomly sample the parameters from specified ranges and 
+        create a random fog color (grayscale).
+        """
+        blur_radius = random.uniform(*self.blur_radius_range)
+        fog_intensity = random.uniform(*self.fog_intensity_range)
+        contrast_factor = random.uniform(*self.contrast_factor_range)
+
+        # For simplicity, let's pick one channel from 0..255 and apply to R, G, B
+        fog_channel = random.randint(0, 255)
+        fog_color = (fog_channel, fog_channel, fog_channel)
+
+        return {
+            "blur_radius": blur_radius,
+            "fog_intensity": fog_intensity,
+            "contrast_factor": contrast_factor,
+            "fog_color": fog_color,
+        }
+
+    @singledispatchmethod
+    def _transform(self, inpt, params):
+        """
+        Default behavior for unsupported input types: return unchanged.
+        """
+        return inpt
+
+    @_transform.register(Image.Image)
+    def _(self, inpt: Image.Image, params):
+        """
+        Handle PIL Images directly.
+        """
+        return self._apply_haze_pil(
+            image=inpt, 
+            blur_radius=params["blur_radius"],
+            fog_intensity=params["fog_intensity"],
+            contrast_factor=params["contrast_factor"],
+            fog_color=params["fog_color"]
+        )
+
+    @_transform.register(torch.Tensor)
+    @_transform.register(tv_tensors.Image)
+    def _(self, inpt: torch.Tensor, params):
+        """
+        Handle torch.Tensor / tv_tensors.Image by converting to PIL,
+        applying haze, and converting back to the original type.
+        """
+        # Convert Tensor -> PIL
+        pil_img = TF.to_pil_image(inpt)
+
+        # Apply haze
+        hazy_pil = self._apply_haze_pil(
+            image=pil_img,
+            blur_radius=params["blur_radius"],
+            fog_intensity=params["fog_intensity"],
+            contrast_factor=params["contrast_factor"],
+            fog_color=params["fog_color"],
+        )
+
+        # Convert back PIL -> Tensor
+        out_tensor = transforms.PILToTensor()(hazy_pil).float()
+
+        # If the input was a tv_tensors.Image, wrap it back in the same class
+        if isinstance(inpt, tv_tensors.Image):
+            return tv_tensors.Image(out_tensor)
+        else:
+            return out_tensor
+
+    @_transform.register(tv_tensors.BoundingBoxes)
+    @_transform.register(tv_tensors.Mask)
+    def _(self, inpt, params):
+        """
+        Do not modify bounding boxes or masks.
+        """
+        return inpt
+
+    def _apply_haze_pil(
+        self, 
+        image: Image.Image, 
+        blur_radius: float, 
+        fog_intensity: float, 
+        contrast_factor: float, 
+        fog_color: tuple
+    ) -> Image.Image:
+        """
+        Apply the haze/fog logic directly to a PIL image.
+        Equivalent to your `add_haze` function, but uses 
+        the parameters from `_get_params`.
+        """
+        # 1. Convert to RGBA to ensure we can blend properly
+        image_mode = image.mode
+        image = image.convert("RGBA")
+
+        # 2. Optionally reduce overall contrast to soften the image
+        contrast_enhancer = ImageEnhance.Contrast(image)
+        image_low_contrast = contrast_enhancer.enhance(contrast_factor)
+
+        # 3. Create a blurred version of the image
+        blurred = image_low_contrast.filter(ImageFilter.GaussianBlur(blur_radius))
+
+        # 4. Blend original (low-contrast) with the blurred version
+        #    Higher alpha in blend => more blur
+        hazy = Image.blend(image_low_contrast, blurred, alpha=0.5)
+
+        # 5. Add a translucent overlay (white or fog_color) to mimic “fog”
+        fog_layer = Image.new("RGBA", hazy.size, fog_color + (0,))
+        overlay_alpha = int(fog_intensity * 255)
+        overlay = Image.new("RGBA", hazy.size, fog_color + (overlay_alpha,))
+        fog_layer.paste(overlay, (0, 0))
+
+        # 6. Composite the fog overlay on top of the hazy image
+        final = Image.alpha_composite(hazy, fog_layer)
+
+        return final.convert(image_mode)
+
+# %% ../nbs/01_transforms.ipynb 40
 class RandomPerspectiveOpenCV:
     def __init__(self, distortion_scale=0.5, p=0.5, fill=0, min_area=1.0, max_attempts=10):
         self.distortion_scale = distortion_scale
@@ -873,7 +1013,7 @@ class RandomPerspectiveOpenCV:
             raise TypeError("Unsupported image type")
 
 
-# %% ../nbs/01_transforms.ipynb 40
+# %% ../nbs/01_transforms.ipynb 42
 import random
 import numpy as np
 import copy

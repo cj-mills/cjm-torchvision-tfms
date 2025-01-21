@@ -1054,9 +1054,13 @@ class RandomPerspectiveCrop(transforms.Transform):
         )
 
     def forward(self, image, target=None):
-        if target is None:
+        # Track whether or not a target was passed in originally
+        has_target = target is not None
+
+        if not has_target:
+            # Use an empty dict internally if no target was provided
             target = {}
-            
+
         # 1) Create a white mask
         target["white_mask"] = self._create_white_mask(image)
     
@@ -1067,7 +1071,9 @@ class RandomPerspectiveCrop(transforms.Transform):
         if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
             h = image.height if isinstance(image, (TVImage, Image.Image)) else image.shape[-2]
             w = image.width  if isinstance(image, (TVImage, Image.Image)) else image.shape[-1]
-            target["boxes"] = self._validate_and_clamp_boxes(target["boxes"], img_height=h, img_width=w)
+            target["boxes"] = self._validate_and_clamp_boxes(
+                target["boxes"], img_height=h, img_width=w
+            )
     
         # 3) Crop (according to the chosen strategy)
         image, target = self._crop_to_white_mask(image, target)
@@ -1079,6 +1085,11 @@ class RandomPerspectiveCrop(transforms.Transform):
         if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
             target["boxes"].canvas_size = (image.height, image.width)
 
+        # If no target was originally passed, return only the image
+        if not has_target:
+            return image
+
+        # Otherwise, return (image, target) as usual
         return image, target
 
     # -----------------------------------------------------
@@ -1323,8 +1334,13 @@ class RandomRotationCrop(transforms.Transform):
         self.center = center
         self.crop_strategy = crop_strategy
 
+
     def forward(self, image, target=None):
-        if target is None:
+        # Flag to detect if a target was originally provided
+        has_target = target is not None
+
+        if not has_target:
+            # Use an empty dict internally if no target was provided
             target = {}
 
         # 1) Create a white mask for tracking the "valid" region after rotation
@@ -1407,6 +1423,11 @@ class RandomRotationCrop(transforms.Transform):
         if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
             target["boxes"].canvas_size = (image.height, image.width)
 
+        # If no target was originally passed, return only the image
+        if not has_target:
+            return image
+
+        # Otherwise, return (image, target)
         return image, target
 
     # -----------------------------------------------------

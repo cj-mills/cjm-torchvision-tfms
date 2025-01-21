@@ -4,7 +4,8 @@
 
 # %% auto 0
 __all__ = ['ResizeMax', 'PadSquare', 'CustomTrivialAugmentWide', 'CustomRandomIoUCrop', 'RandomPatchCopy', 'RandomPixelCopy',
-           'CustomRandomAugment', 'AddLightGlare', 'AddHaze', 'RandomPerspectiveOpenCV', 'RandomPerspectiveCrop']
+           'CustomRandomAugment', 'AddLightGlare', 'AddHaze', 'RandomPerspectiveOpenCV', 'RandomPerspectiveCrop',
+           'RandomRotationCrop']
 
 # %% ../nbs/01_transforms.ipynb 4
 import sys
@@ -1201,6 +1202,346 @@ class RandomPerspectiveCrop(transforms.Transform):
     def _crop_largest_rectangle(self, image, target, wm_tensor):
         """
         Uses find_largest_rectangle_coords(...) approach to find
+        the largest rectangle of True pixels in wm_tensor, then crops
+        image/boxes/masks to that rectangle.
+        """
+        # Convert torch tensor -> numpy array (bool)
+        white_mask_np = wm_tensor.cpu().numpy()  # shape [H, W], dtype=bool
+
+        # 1) Find row_slice, col_slice
+        row_slice, col_slice = find_largest_rectangle_coords(white_mask_np)
+        # row_slice and col_slice are Python slice objects
+
+        # If the largest rectangle is effectively zero-sized, skip
+        if row_slice.stop <= row_slice.start or col_slice.stop <= col_slice.start:
+            return image, target
+
+        # 2) Convert slices to top, left, height, width
+        top = row_slice.start
+        left = col_slice.start
+        bottom = row_slice.stop
+        right = col_slice.stop
+
+        crop_height = bottom - top
+        crop_width = right - left
+
+        # Basic sanity
+        if crop_height <= 0 or crop_width <= 0:
+            return image, target
+
+        # 3) Crop the image
+        image = F.crop(
+            image,
+            top=top,
+            left=left,
+            height=crop_height,
+            width=crop_width
+        )
+
+        # 4) Crop bounding boxes
+        boxes = target.get("boxes", None)
+        if isinstance(boxes, BoundingBoxes):
+            target["boxes"] = F.crop(
+                boxes,
+                top=top,
+                left=left,
+                height=crop_height,
+                width=crop_width
+            )
+
+        # 5) Crop masks
+        masks = target.get("masks", None)
+        if isinstance(masks, Mask):
+            target["masks"] = F.crop(
+                masks,
+                top=top,
+                left=left,
+                height=crop_height,
+                width=crop_width
+            )
+        elif isinstance(masks, list):
+            new_list = []
+            for m in masks:
+                new_list.append(
+                    F.crop(
+                        m,
+                        top=top,
+                        left=left,
+                        height=crop_height,
+                        width=crop_width
+                    )
+                )
+            target["masks"] = new_list
+
+        return image, target
+
+    # -----------------------------------------------------
+    # Helper: Validate/clamp bounding boxes
+    # -----------------------------------------------------
+    def _validate_and_clamp_boxes(self, boxes: BoundingBoxes, img_height: int, img_width: int):
+        x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
+        x1_clamped = x1.clamp(min=0, max=img_width - 1)
+        y1_clamped = y1.clamp(min=0, max=img_height - 1)
+        x2_clamped = x2.clamp(min=0, max=img_width - 1)
+        y2_clamped = y2.clamp(min=0, max=img_height - 1)
+    
+        new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
+        updated_boxes = BoundingBoxes(new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width))
+        return updated_boxes
+
+# %% ../nbs/01_transforms.ipynb 44
+class RandomRotationCrop(transforms.Transform):
+    """
+    Randomly applies a rotation to an image (and its target data),
+    then crops the result based on a chosen strategy. Similar to
+    RandomPerspectiveCrop, but wraps RandomRotation instead.
+    """
+
+    def __init__(
+        self,
+        degrees,
+        p=0.5,
+        fill=0,
+        expand=False,
+        center=None,
+        crop_strategy="all_nonzero",  # or "largest_rectangle"
+    ):
+        """
+        Args:
+            degrees: Range of degrees (min, max) for rotation.
+            p (float): Probability of applying the rotation.
+            fill (int or tuple): Pixel fill value for the area outside the rotated image.
+            expand (bool): If True, expand the output image to hold the entire rotated image.
+            center (tuple): Optional center of rotation.
+            crop_strategy (str): "all_nonzero" or "largest_rectangle"
+        """
+        super().__init__()
+        self.degrees = degrees
+        self.p = p
+        self.fill = fill
+        self.expand = expand
+        self.center = center
+        self.crop_strategy = crop_strategy
+
+    def forward(self, image, target=None):
+        if target is None:
+            target = {}
+
+        # 1) Create a white mask for tracking the "valid" region after rotation
+        target["white_mask"] = self._create_white_mask(image)
+
+        # 2) Decide whether to apply the rotation
+        if random.random() < self.p:
+            # Choose random angle
+            angle = self._get_random_angle(self.degrees)
+
+            # Rotate image
+            image = F.rotate(
+                image,
+                angle=angle,
+                expand=self.expand,
+                center=self.center,
+                fill=self.fill
+            )
+
+            # Rotate bounding boxes
+            if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
+                boxes = target["boxes"]
+                boxes = F.rotate(
+                    boxes,
+                    angle=angle,
+                    expand=self.expand,
+                    center=self.center,
+                    # fill is not used by bounding boxes, so we omit it
+                )
+                # Because rotation can move boxes out of bounds, clamp them
+                h = image.height if isinstance(image, (TVImage, Image.Image)) else image.shape[-2]
+                w = image.width  if isinstance(image, (TVImage, Image.Image)) else image.shape[-1]
+                boxes = self._validate_and_clamp_boxes(boxes, img_height=h, img_width=w)
+                target["boxes"] = boxes
+
+            # Rotate masks
+            if "masks" in target:
+                masks = target["masks"]
+                if isinstance(masks, Mask):
+                    masks = F.rotate(
+                        masks,
+                        angle=angle,
+                        expand=self.expand,
+                        center=self.center,
+                        fill=False,  # For boolean mask, fill with False
+                    )
+                elif isinstance(masks, list):
+                    rotated_list = []
+                    for m in masks:
+                        rotated_list.append(
+                            F.rotate(
+                                m,
+                                angle=angle,
+                                expand=self.expand,
+                                center=self.center,
+                                fill=False,
+                            )
+                        )
+                    masks = rotated_list
+                target["masks"] = masks
+
+            # Rotate the "white_mask"
+            wm = target["white_mask"]
+            wm = F.rotate(
+                wm,
+                angle=angle,
+                expand=self.expand,
+                center=self.center,
+                fill=False,  # fill with False for the mask
+            )
+            target["white_mask"] = wm
+
+        # 3) Crop (according to the chosen strategy)
+        image, target = self._crop_to_white_mask(image, target)
+
+        # 4) Remove 'white_mask'
+        target.pop("white_mask", None)
+
+        # 5) Update boxes' canvas_size (if boxes exist)
+        if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
+            target["boxes"].canvas_size = (image.height, image.width)
+
+        return image, target
+
+    # -----------------------------------------------------
+    # Helper: Generate a random angle from degrees tuple/int
+    # -----------------------------------------------------
+    def _get_random_angle(self, degrees):
+        """If degrees is a (min, max) tuple, sample uniformly;
+           if it's a single float/int, sample from [-degrees, degrees]."""
+        if isinstance(degrees, (list, tuple)):
+            assert len(degrees) == 2, "degrees should be (min, max)"
+            return random.uniform(degrees[0], degrees[1])
+        else:
+            return random.uniform(-abs(degrees), abs(degrees))
+
+    # -----------------------------------------------------
+    # Helper: Create a white Mask of the same size as `image`
+    # -----------------------------------------------------
+    def _create_white_mask(self, image):
+        if isinstance(image, Image.Image):
+            w, h = image.size
+        elif isinstance(image, TVImage):
+            # tv_tensors.Image: shape [C, H, W]
+            _, h, w = image.shape
+        elif isinstance(image, torch.Tensor):
+            # Plain tensor: shape could be [C, H, W] or [H, W]
+            # We'll assume [C, H, W].
+            _, h, w = image.shape
+        else:
+            raise TypeError("Unsupported image type for creating white mask")
+
+        # Create a white (255) PIL mask
+        pil_mask = Image.new("L", (w, h), color=255)
+
+        # Convert to a bool Mask
+        mask_tensor = transforms.PILToTensor()(pil_mask).bool()  # shape [1, H, W]
+        return Mask(mask_tensor)
+
+    # -----------------------------------------------------
+    # Helper: Crop to the white mask
+    # -----------------------------------------------------
+    def _crop_to_white_mask(self, image, target):
+        white_mask = target.get("white_mask", None)
+        if white_mask is None:
+            return image, target
+
+        # Convert tv_tensors.Mask -> a boolean tensor [H, W]
+        wm_tensor = white_mask.as_subclass(torch.Tensor).squeeze(0)  # shape [H, W]
+
+        # Decide how to find the region to crop
+        if self.crop_strategy == "largest_rectangle":
+            image, target = self._crop_largest_rectangle(image, target, wm_tensor)
+        else:
+            # Default: bounding box around all non-zero pixels
+            image, target = self._crop_all_nonzero(image, target, wm_tensor)
+
+        return image, target
+
+    # -----------------------------------------------------
+    # Strategy A: "all_nonzero" bounding box
+    # -----------------------------------------------------
+    def _crop_all_nonzero(self, image, target, wm_tensor):
+        # wm_tensor is boolean, shape [H, W]
+        rows = wm_tensor.any(dim=1)  # shape [H]
+        cols = wm_tensor.any(dim=0)  # shape [W]
+
+        if not rows.any() or not cols.any():
+            return image, target  # No white area at all
+
+        y_min = torch.where(rows)[0].min()
+        y_max = torch.where(rows)[0].max()
+        x_min = torch.where(cols)[0].min()
+        x_max = torch.where(cols)[0].max()
+
+        # Clamp to image boundaries
+        y_min = torch.clamp(y_min, 0, image.height - 1)
+        y_max = torch.clamp(y_max, 0, image.height - 1)
+        x_min = torch.clamp(x_min, 0, image.width - 1)
+        x_max = torch.clamp(x_max, 0, image.width - 1)
+
+        if x_min >= x_max or y_min >= y_max:
+            return image, target
+
+        crop_width = (x_max - x_min + 1).item()
+        crop_height = (y_max - y_min + 1).item()
+
+        if crop_width <= 0 or crop_height <= 0:
+            return image, target
+
+        # Now do the crop
+        image = F.crop(
+            image,
+            top=y_min.item(),
+            left=x_min.item(),
+            height=crop_height,
+            width=crop_width
+        )
+
+        # Crop bboxes
+        boxes = target.get("boxes", None)
+        if isinstance(boxes, BoundingBoxes):
+            target["boxes"] = F.crop(
+                boxes,
+                top=y_min.item(),
+                left=x_min.item(),
+                height=crop_height,
+                width=crop_width
+            )
+
+        # Crop masks
+        masks = target.get("masks", None)
+        if isinstance(masks, Mask):
+            target["masks"] = F.crop(
+                masks,
+                top=y_min.item(),
+                left=x_min.item(),
+                height=crop_height,
+                width=crop_width
+            )
+        elif isinstance(masks, list):
+            new_list = []
+            for m in masks:
+                new_list.append(
+                    F.crop(m, top=y_min.item(), left=x_min.item(),
+                           height=crop_height, width=crop_width)
+                )
+            target["masks"] = new_list
+
+        return image, target
+
+    # -----------------------------------------------------
+    # Strategy B: "largest_rectangle" inside the white mask
+    # -----------------------------------------------------
+    def _crop_largest_rectangle(self, image, target, wm_tensor):
+        """
+        Uses find_largest_rectangle_coords(...) to find
         the largest rectangle of True pixels in wm_tensor, then crops
         image/boxes/masks to that rectangle.
         """

@@ -1035,19 +1035,22 @@ class RandomPerspectiveCrop(transforms.Transform):
     cropped to valid (non-distorted) areas.
     """
 
+
     def __init__(
         self,
         distortion_scale=0.5,
         p=0.5,
         fill=0,
-        crop_strategy="all_nonzero"  # or "largest_rectangle"
+        crop_strategy="all_nonzero",
+        pad=0
     ):
         super().__init__()
         self.distortion_scale = distortion_scale
         self.p = p
         self.fill = fill
         self.crop_strategy = crop_strategy
-        
+        self.pad = pad
+
         self._random_perspective = RandomPerspectiveOpenCV(
             distortion_scale=self.distortion_scale,
             p=self.p,
@@ -1055,42 +1058,76 @@ class RandomPerspectiveCrop(transforms.Transform):
         )
 
     def forward(self, image, target=None):
-        # Track whether or not a target was passed in originally
         has_target = target is not None
-
         if not has_target:
-            # Use an empty dict internally if no target was provided
             target = {}
 
         # 1) Create a white mask
         target["white_mask"] = self._create_white_mask(image)
-    
+
         # 2) Apply random perspective
         image, target = self._random_perspective(image, target)
 
         # 2.5) Validate bounding boxes after warp
         if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
-            h = image.height if isinstance(image, (TVImage, Image.Image)) else image.shape[-2]
-            w = image.width  if isinstance(image, (TVImage, Image.Image)) else image.shape[-1]
+            h = image.height if isinstance(image, (TVImage, Image.Image)) else image.size[1]
+            w = image.width  if isinstance(image, (TVImage, Image.Image)) else image.size[0]
             target["boxes"] = self._validate_and_clamp_boxes(
                 target["boxes"], img_height=h, img_width=w
             )
-    
+
         # 3) Crop (according to the chosen strategy)
         image, target = self._crop_to_white_mask(image, target)
-    
+
         # 4) Remove 'white_mask'
         target.pop("white_mask", None)
-    
+
+        # 4.5) Pad if requested
+        if self.pad > 0:
+            image, target = self._pad_after_crop(image, target)
+
         # Update boxes' canvas_size
         if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
             target["boxes"].canvas_size = (image.height, image.width)
 
-        # If no target was originally passed, return only the image
         if not has_target:
             return image
+        return image, target
 
-        # Otherwise, return (image, target) as usual
+    # -----------------------------------------------------
+    # New helper to pad image, boxes, masks
+    # -----------------------------------------------------
+    def _pad_after_crop(self, image, target):
+        """
+        Pads the image on all sides by `self.pad`. Then shifts the bounding
+        boxes and masks accordingly. This helps avoid out-of-bounds in later
+        warping transforms.
+        """
+        # 1) Pad the image
+        #    `TF.pad` expects the sequence (left, top, right, bottom).
+        image = TF.pad(image, [self.pad, self.pad, self.pad, self.pad], fill=random.randint(0,255))
+
+        # 2) Shift bounding boxes
+        if "boxes" in target and isinstance(target["boxes"], BoundingBoxes):
+            boxes = target["boxes"]
+            # Shift by (pad, pad, pad, pad)
+            shift = torch.tensor([self.pad, self.pad, self.pad, self.pad], device=boxes.device)
+            shifted_boxes = boxes + shift
+
+            # Update canvas size
+            shifted_boxes.canvas_size = (image.height, image.width)
+            target["boxes"] = shifted_boxes
+
+        # 3) Pad or shift masks
+        if "masks" in target:
+            if isinstance(target["masks"], Mask):
+                target["masks"] = TF.pad(target["masks"], [self.pad]*4, fill=False)
+            elif isinstance(target["masks"], list):
+                new_list = []
+                for m in target["masks"]:
+                    new_list.append(TF.pad(m, [self.pad]*4, fill=False))
+                target["masks"] = new_list
+
         return image, target
 
     # -----------------------------------------------------

@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['ResizeMax', 'PadSquare', 'CustomTrivialAugmentWide', 'CustomRandomIoUCrop', 'RandomPatchCopy', 'RandomPixelCopy',
            'CustomRandomAugment', 'AddLightGlare', 'AddHaze', 'RandomPerspectiveOpenCV', 'RandomPerspectiveCrop',
-           'RandomRotationCrop']
+           'RandomRotationCrop', 'RandomOneDimResize']
 
 # %% ../nbs/01_transforms.ipynb 4
 import sys
@@ -36,6 +36,7 @@ from torchvision.ops import box_convert
 from torchvision.tv_tensors import BoundingBoxFormat
 from torchvision.tv_tensors import wrap as tv_wrap
 from torchvision.utils import draw_bounding_boxes
+from torchvision.transforms.v2.functional import InterpolationMode
 
 import random
 import numpy as np
@@ -1649,3 +1650,92 @@ class RandomRotationCrop(transforms.Transform):
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
         updated_boxes = BoundingBoxes(new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width))
         return updated_boxes
+
+# %% ../nbs/01_transforms.ipynb 46
+class RandomOneDimResize(transforms.Transform):
+    """
+    A PyTorch Transform that randomly scales only one dimension (height or width)
+    of an image by a random factor within a specified range, while keeping the
+    other dimension unchanged.
+    """
+    
+    def __init__(
+        self,
+        scale_range=(0.5, 1.5),
+        interpolation=InterpolationMode.BILINEAR,
+        antialias=True
+    ):
+        """
+        Initializes the transform with the desired scale range, interpolation
+        mode, and an antialiasing flag.
+
+        Args:
+            scale_range (tuple of float): The minimum and maximum scale factors
+                to sample from. For example, (0.5, 1.5) means the chosen dimension
+                will be scaled between 50% and 150% of its original size.
+            interpolation (InterpolationMode): Interpolation mode used for resizing.
+            antialias (bool): Whether to use anti-aliasing when resizing.
+        """
+        super().__init__()
+        self.scale_range = scale_range
+        self.interpolation = interpolation
+        self.antialias = antialias
+        self.scale = None
+        self.side = None
+
+
+    def forward(self, 
+                *inputs: Any # The inputs to the forward method.
+               ) -> Any: # The result of the superclass forward method.
+        """
+        
+        """
+        # Sample a random scale factor in the provided range
+        self.scale = random.uniform(*self.scale_range)
+        self.side = random.random()
+        return super().forward(*inputs)
+        
+    def _transform(
+        self,
+        inpt: torch.Tensor,
+        params: dict
+    ) -> torch.Tensor:
+        """
+        Apply the RandomOneDimResize transformation on the input image tensor.
+
+        Args:
+            inpt (torch.Tensor): The input image tensor to be transformed.
+            params (dict): A dictionary of parameters (not used here).
+
+        Returns:
+            torch.Tensor: The transformed (resized) image tensor.
+        """
+        # Copy the input to a local variable (optional but often clearer)
+        x = inpt
+        
+        # Get the (height, width) of the image tensor
+        h, w = TF.get_size(x)  # returns (height, width)
+        
+        # Randomly choose which dimension (height or width) to scale
+        if self.side < 0.5:
+            # Scale the height, keep the width unchanged
+            new_h = int(h * self.scale)
+            new_w = w
+        else:
+            # Scale the width, keep the height unchanged
+            new_h = h
+            new_w = int(w * self.scale)
+        
+        # Make sure we don't get 0 for any dimension
+        new_h = max(new_h, 1)
+        new_w = max(new_w, 1)
+        
+        # Resize the image using v2 functional API
+        x = TF.resize(
+            x,
+            size=(new_h, new_w),
+            interpolation=self.interpolation,
+            antialias=self.antialias
+        )
+        
+        return x

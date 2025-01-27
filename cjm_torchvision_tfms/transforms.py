@@ -1299,27 +1299,33 @@ class RandomPerspectiveCrop(transforms.Transform):
         # Unpack the coordinates
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
     
-        # Clamp to image boundaries
-        x1_clamped = x1.clamp(min=0, max=img_width - 1)
-        y1_clamped = y1.clamp(min=0, max=img_height - 1)
-        x2_clamped = x2.clamp(min=0, max=img_width - 1)
-        y2_clamped = y2.clamp(min=0, max=img_height - 1)
+        # A small epsilon to avoid exact boundary coordinates like (width-1)
+        EPSILON = 1e-4
     
-        # Stack them back into one tensor
+        # Clamp to [0+epsilon, (dim-1)-epsilon] so floating coords don't land exactly at the edge
+        # Note: If your bounding boxes are integer-based, you could clamp to [0, dim-1] then floor below.
+        x1_clamped = x1.clamp(min=0.0 + EPSILON, max=(img_width - 1) - EPSILON)
+        y1_clamped = y1.clamp(min=0.0 + EPSILON, max=(img_height - 1) - EPSILON)
+        x2_clamped = x2.clamp(min=0.0 + EPSILON, max=(img_width - 1) - EPSILON)
+        y2_clamped = y2.clamp(min=0.0 + EPSILON, max=(img_height - 1) - EPSILON)
+    
+        # If you prefer integer pixel coordinates, floor them here
+        x1_clamped = x1_clamped.floor()
+        y1_clamped = y1_clamped.floor()
+        x2_clamped = x2_clamped.floor()
+        y2_clamped = y2_clamped.floor()
+    
+        # Re-stack into a single [N, 4] tensor
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
     
-        # Identify boxes that became invalid (e.g., x2 <= x1 or y2 <= y1 after clamping)
-        # and "mark" them as degenerate by setting them to (0,0,0,0).
+        # Mark invalid boxes (e.g., x2 <= x1 or y2 <= y1) as degenerate (0,0,0,0)
         invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
                        (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+        new_boxes_xyxy[invalid_mask] = 0
     
-        new_boxes_xyxy[invalid_mask] = 0  # Mark invalid boxes for later removal
-    
-        # Build a new BoundingBoxes object with the same format and new coordinates
+        # Create the new BoundingBoxes object
         updated_boxes = BoundingBoxes(
-            new_boxes_xyxy,
-            format="xyxy",
-            canvas_size=(img_height, img_width)
+            new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width)
         )
         return updated_boxes
 
@@ -1671,27 +1677,33 @@ class RandomRotationCrop(transforms.Transform):
         # Unpack the coordinates
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
     
-        # Clamp to image boundaries
-        x1_clamped = x1.clamp(min=0, max=img_width - 1)
-        y1_clamped = y1.clamp(min=0, max=img_height - 1)
-        x2_clamped = x2.clamp(min=0, max=img_width - 1)
-        y2_clamped = y2.clamp(min=0, max=img_height - 1)
+        # A small epsilon to avoid exact boundary coordinates like (width-1)
+        EPSILON = 1e-4
     
-        # Stack them back into one tensor
+        # Clamp to [0+epsilon, (dim-1)-epsilon] so floating coords don't land exactly at the edge
+        # Note: If your bounding boxes are integer-based, you could clamp to [0, dim-1] then floor below.
+        x1_clamped = x1.clamp(min=0.0 + EPSILON, max=(img_width - 1) - EPSILON)
+        y1_clamped = y1.clamp(min=0.0 + EPSILON, max=(img_height - 1) - EPSILON)
+        x2_clamped = x2.clamp(min=0.0 + EPSILON, max=(img_width - 1) - EPSILON)
+        y2_clamped = y2.clamp(min=0.0 + EPSILON, max=(img_height - 1) - EPSILON)
+    
+        # If you prefer integer pixel coordinates, floor them here
+        x1_clamped = x1_clamped.floor()
+        y1_clamped = y1_clamped.floor()
+        x2_clamped = x2_clamped.floor()
+        y2_clamped = y2_clamped.floor()
+    
+        # Re-stack into a single [N, 4] tensor
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
     
-        # Identify boxes that became invalid (e.g., x2 <= x1 or y2 <= y1 after clamping)
-        # and "mark" them as degenerate by setting them to (0,0,0,0).
+        # Mark invalid boxes (e.g., x2 <= x1 or y2 <= y1) as degenerate (0,0,0,0)
         invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
                        (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+        new_boxes_xyxy[invalid_mask] = 0
     
-        new_boxes_xyxy[invalid_mask] = 0  # Mark invalid boxes for later removal
-    
-        # Build a new BoundingBoxes object with the same format and new coordinates
+        # Create the new BoundingBoxes object
         updated_boxes = BoundingBoxes(
-            new_boxes_xyxy,
-            format="xyxy",
-            canvas_size=(img_height, img_width)
+            new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width)
         )
         return updated_boxes
 

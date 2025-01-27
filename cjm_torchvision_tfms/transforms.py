@@ -1300,7 +1300,7 @@ class RandomPerspectiveCrop(transforms.Transform):
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
     
         # A small epsilon to avoid exact boundary coordinates like (width-1)
-        EPSILON = 1e-4
+        EPSILON = 1.0
     
         # Clamp to [0+epsilon, (dim-1)-epsilon] so floating coords don't land exactly at the edge
         # Note: If your bounding boxes are integer-based, you could clamp to [0, dim-1] then floor below.
@@ -1678,7 +1678,7 @@ class RandomRotationCrop(transforms.Transform):
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
     
         # A small epsilon to avoid exact boundary coordinates like (width-1)
-        EPSILON = 1e-4
+        EPSILON = 1.0
     
         # Clamp to [0+epsilon, (dim-1)-epsilon] so floating coords don't land exactly at the edge
         # Note: If your bounding boxes are integer-based, you could clamp to [0, dim-1] then floor below.

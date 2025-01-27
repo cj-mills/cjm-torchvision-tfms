@@ -1290,15 +1290,37 @@ class RandomPerspectiveCrop(transforms.Transform):
     # -----------------------------------------------------
     # Helper: Validate/clamp bounding boxes
     # -----------------------------------------------------
-    def _validate_and_clamp_boxes(self, boxes: BoundingBoxes, img_height: int, img_width: int):
+    def _validate_and_clamp_boxes(
+        self,
+        boxes: BoundingBoxes,
+        img_height: int,
+        img_width: int
+    ):
+        # Unpack the coordinates
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
+    
+        # Clamp to image boundaries
         x1_clamped = x1.clamp(min=0, max=img_width - 1)
         y1_clamped = y1.clamp(min=0, max=img_height - 1)
         x2_clamped = x2.clamp(min=0, max=img_width - 1)
         y2_clamped = y2.clamp(min=0, max=img_height - 1)
     
+        # Stack them back into one tensor
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
-        updated_boxes = BoundingBoxes(new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width))
+    
+        # Identify boxes that became invalid (e.g., x2 <= x1 or y2 <= y1 after clamping)
+        # and "mark" them as degenerate by setting them to (0,0,0,0).
+        invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
+                       (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+    
+        new_boxes_xyxy[invalid_mask] = 0  # Mark invalid boxes for later removal
+    
+        # Build a new BoundingBoxes object with the same format and new coordinates
+        updated_boxes = BoundingBoxes(
+            new_boxes_xyxy,
+            format="xyxy",
+            canvas_size=(img_height, img_width)
+        )
         return updated_boxes
 
 # %% ../nbs/01_transforms.ipynb 44
@@ -1640,15 +1662,37 @@ class RandomRotationCrop(transforms.Transform):
     # -----------------------------------------------------
     # Helper: Validate/clamp bounding boxes
     # -----------------------------------------------------
-    def _validate_and_clamp_boxes(self, boxes: BoundingBoxes, img_height: int, img_width: int):
+    def _validate_and_clamp_boxes(
+        self,
+        boxes: BoundingBoxes,
+        img_height: int,
+        img_width: int
+    ):
+        # Unpack the coordinates
         x1, y1, x2, y2 = boxes[..., 0], boxes[..., 1], boxes[..., 2], boxes[..., 3]
+    
+        # Clamp to image boundaries
         x1_clamped = x1.clamp(min=0, max=img_width - 1)
         y1_clamped = y1.clamp(min=0, max=img_height - 1)
         x2_clamped = x2.clamp(min=0, max=img_width - 1)
         y2_clamped = y2.clamp(min=0, max=img_height - 1)
     
+        # Stack them back into one tensor
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
-        updated_boxes = BoundingBoxes(new_boxes_xyxy, format="xyxy", canvas_size=(img_height, img_width))
+    
+        # Identify boxes that became invalid (e.g., x2 <= x1 or y2 <= y1 after clamping)
+        # and "mark" them as degenerate by setting them to (0,0,0,0).
+        invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
+                       (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+    
+        new_boxes_xyxy[invalid_mask] = 0  # Mark invalid boxes for later removal
+    
+        # Build a new BoundingBoxes object with the same format and new coordinates
+        updated_boxes = BoundingBoxes(
+            new_boxes_xyxy,
+            format="xyxy",
+            canvas_size=(img_height, img_width)
+        )
         return updated_boxes
 
 # %% ../nbs/01_transforms.ipynb 46

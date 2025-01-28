@@ -1356,9 +1356,9 @@ class RandomPerspectiveCrop(transforms.Transform):
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
     
         # Mark invalid boxes (e.g., x2 <= x1 or y2 <= y1) as degenerate (0,0,0,0)
-        invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
-                       (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
-        new_boxes_xyxy[invalid_mask] = 0
+        # invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
+        #                (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+        # new_boxes_xyxy[invalid_mask] = 0
     
         # Create the new BoundingBoxes object
         updated_boxes = BoundingBoxes(
@@ -1733,10 +1733,10 @@ class RandomRotationCrop(transforms.Transform):
         # Re-stack into a single [N, 4] tensor
         new_boxes_xyxy = torch.stack([x1_clamped, y1_clamped, x2_clamped, y2_clamped], dim=-1)
     
-        # Mark invalid boxes (e.g., x2 <= x1 or y2 <= y1) as degenerate (0,0,0,0)
-        invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
-                       (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
-        new_boxes_xyxy[invalid_mask] = 0
+        # # Mark invalid boxes (e.g., x2 <= x1 or y2 <= y1) as degenerate (0,0,0,0)
+        # invalid_mask = (new_boxes_xyxy[..., 2] <= new_boxes_xyxy[..., 0]) | \
+        #                (new_boxes_xyxy[..., 3] <= new_boxes_xyxy[..., 1])
+        # new_boxes_xyxy[invalid_mask] = 0
     
         # Create the new BoundingBoxes object
         updated_boxes = BoundingBoxes(

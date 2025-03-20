@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://cj-mills.github.io/cjm-torchvision-tfms/index.html</loc>
+    <lastmod>2025-03-20T23:43:32.874Z</lastmod>
+  </url>
+  <url>
+    <loc>https://cj-mills.github.io/cjm-torchvision-tfms/collate_funcs.html</loc>
+    <lastmod>2025-03-20T23:43:35.897Z</lastmod>
+  </url>
+  <url>
+    <loc>https://cj-mills.github.io/cjm-torchvision-tfms/core.html</loc>
+    <lastmod>2025-03-20T23:43:36.151Z</lastmod>
+  </url>
+  <url>
+    <loc>https://cj-mills.github.io/cjm-torchvision-tfms/transforms.html</loc>
+    <lastmod>2025-03-20T23:43:35.510Z</lastmod>
+  </url>
+  <url>
+    <loc>https://cj-mills.github.io/cjm-torchvision-tfms/utils.html</loc>
+    <lastmod>2025-03-20T23:43:32.800Z</lastmod>
+  </url>
+</urlset>

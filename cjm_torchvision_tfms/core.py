@@ -55,7 +55,7 @@ class ResizeMax(transforms.Transform):
         # Set the maximum size for any dimension of the image
         self.max_sz = max_sz
         
-    def _transform(self, 
+    def transform(self, 
                    inpt: Any, # The input image tensor to be resized.
                    params: Dict[str, Any] # A dictionary of parameters. Not used in this method but is present for compatibility with the parent's method signature.
                   ) -> torch.Tensor: # The resized image tensor.
@@ -111,12 +111,12 @@ class PadSquare(transforms.Transform):
         self.pad_split = random.random() if self.shift else None
         return super().forward(*inputs)
 
-    def _transform(self, 
+    def transform(self, 
                    inpt: Any, # The input to be transformed.
                    params: Dict[str, Any] # A dictionary of parameters for the transformation.
                   ) -> Any: # The transformed input.
         """
-        The _transform method that applies padding to the input to make it square.
+        The transform method that applies padding to the input to make it square.
         """
         x = inpt
         
@@ -344,12 +344,12 @@ class RandomPatchCopy(transforms.Transform):
 
 
     @singledispatchmethod
-    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
+    def transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         """Default Behavior: Don't modify the input"""
         return inpt
 
-    @_transform.register(torch.Tensor)
-    @_transform.register(tv_tensors.Image)
+    @transform.register(torch.Tensor)
+    @transform.register(tv_tensors.Image)
     def _(self, inpt: Union[torch.Tensor, tv_tensors.Image], params: Dict[str, Any]) -> Any:
         self.patches = []
         """Apply the `rand_square_copy` function to the input tensor multiple times"""
@@ -358,13 +358,13 @@ class RandomPatchCopy(transforms.Transform):
             self.patches.append(patch)
         return inpt
 
-    @_transform.register(Image.Image)
+    @transform.register(Image.Image)
     def _(self, inpt: Image.Image, params: Dict[str, Any]) -> Any:
         """Convert the PIL Image to a torch.Tensor to apply the transform"""
         inpt_torch = transforms.PILToTensor()(inpt)    
-        return transforms.ToPILImage()(self._transform(inpt_torch, params))
+        return transforms.ToPILImage()(self.transform(inpt_torch, params))
     
-    @_transform.register(BoundingBoxes)
+    @transform.register(BoundingBoxes)
     def _(self, inpt: BoundingBoxes, params: Dict[str, Any]) -> Any:
         """Update the bounding box annotations based on the list of patches"""
         if len(self.patches) > 0:
@@ -379,7 +379,7 @@ class RandomPatchCopy(transforms.Transform):
             return tv_wrap(inpt_copy, like=inpt)
         return inpt
 
-    @_transform.register(Mask)
+    @transform.register(Mask)
     def _(self, inpt: Mask, params: Dict[str, Any]) -> Any:
         """Don't modify segmentation annotations"""
         return inpt
@@ -437,24 +437,24 @@ class RandomPixelCopy(transforms.Transform):
         return img_tensor.squeeze(0) if src_dim == 3 else img_tensor
 
     @singledispatchmethod
-    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
+    def transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         """Default Behavior: Don't modify the input"""
         return inpt
 
-    @_transform.register(torch.Tensor)
-    @_transform.register(tv_tensors.Image)
+    @transform.register(torch.Tensor)
+    @transform.register(tv_tensors.Image)
     def _(self, inpt: Union[torch.Tensor, tv_tensors.Image], params: Dict[str, Any]) -> Any:
         """Apply the `rand_pixel_copy` method to the input tensor"""
         return self.rand_pixel_copy(inpt, max(self.min_pct, random.random() * self.max_pct))
 
-    @_transform.register(Image.Image)
+    @transform.register(Image.Image)
     def _(self, inpt: Image.Image, params: Dict[str, Any]) -> Any:
         """Convert the PIL Image to a torch.Tensor to apply the transform"""
         inpt_torch = transforms.PILToTensor()(inpt)
-        return transforms.ToPILImage()(self._transform(inpt_torch, params))
+        return transforms.ToPILImage()(self.transform(inpt_torch, params))
 
-    @_transform.register(BoundingBoxes)
-    @_transform.register(Mask)
+    @transform.register(BoundingBoxes)
+    @transform.register(Mask)
     def _(self, inpt: Union[BoundingBoxes, Mask], params: Dict[str, Any]) -> Any:
         """Don't modify image annotations"""
         return inpt
@@ -600,13 +600,13 @@ class AddLightGlare(transforms.Transform):
         }
 
     @singledispatchmethod
-    def _transform(self, inpt, params):
+    def transform(self, inpt, params):
         """
         Default behavior for unsupported input types: return unchanged.
         """
         return inpt
 
-    @_transform.register(Image.Image)
+    @transform.register(Image.Image)
     def _(self, inpt: Image.Image, params):
         """
         Handle PIL Images directly.
@@ -618,8 +618,8 @@ class AddLightGlare(transforms.Transform):
             intensity=params["intensity"],
         )
 
-    @_transform.register(torch.Tensor)
-    @_transform.register(tv_tensors.Image)
+    @transform.register(torch.Tensor)
+    @transform.register(tv_tensors.Image)
     def _(self, inpt: torch.Tensor, params):
         """
         Handle torch.Tensor / tv_tensors.Image by converting to PIL,
@@ -645,8 +645,8 @@ class AddLightGlare(transforms.Transform):
         else:
             return out_tensor
 
-    @_transform.register(tv_tensors.BoundingBoxes)
-    @_transform.register(tv_tensors.Mask)
+    @transform.register(tv_tensors.BoundingBoxes)
+    @transform.register(tv_tensors.Mask)
     def _(self, inpt, params):
         """
         Do not modify bounding boxes or masks.

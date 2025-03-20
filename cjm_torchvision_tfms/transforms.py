@@ -194,7 +194,7 @@ class CustomRandomIoUCrop(transforms.RandomIoUCrop):
         super().__init__(min_scale, max_scale, min_aspect_ratio, max_aspect_ratio, sampler_options, trials)
         self.jitter_factor = jitter_factor
     
-    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
+    def make_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         orig_h, orig_w = query_size(flat_inputs)
         bboxes = get_bounding_boxes(flat_inputs)
         
@@ -586,7 +586,7 @@ class AddLightGlare(transforms.Transform):
         self.blur_radius_range = blur_radius_range
         self.intensity_range = intensity_range
 
-    def _get_params(self, sample: Any) -> Dict[str, float]:
+    def make_params(self, sample: Any) -> Dict[str, float]:
         """
         Randomly sample the parameters from the specified ranges.
         """
@@ -715,7 +715,7 @@ class AddHaze(transforms.Transform):
         self.fog_intensity_range = fog_intensity_range
         self.contrast_factor_range = contrast_factor_range
 
-    def _get_params(self, sample: Any) -> Dict[str, float]:
+    def make_params(self, sample: Any) -> Dict[str, float]:
         """
         Randomly sample the parameters from specified ranges and 
         create a random fog color (grayscale).
@@ -802,7 +802,7 @@ class AddHaze(transforms.Transform):
         """
         Apply the haze/fog logic directly to a PIL image.
         Equivalent to your `add_haze` function, but uses 
-        the parameters from `_get_params`.
+        the parameters from `make_params`.
         """
         # 1. Convert to RGBA to ensure we can blend properly
         image_mode = image.mode
